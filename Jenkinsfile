@@ -2,91 +2,57 @@
 pipeline {
     agent any
 
-    environment {
-        AWS_REGION = 'ap-south-1'
-        ECR_REPOSITORY = 'little-bloom-cafe'
-        IMAGE_TAG = "${BUILD_NUMBER}"
-        AWS_ACCOUNT_ID = 'YOUR_AWS_ACCOUNT_ID'
-        ECR_REGISTRY = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
-        IMAGE_NAME = "${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}"
+    options {
+        timestamps()
     }
 
     stages {
-        stage('Checkout') {
+        stage('Check Tools') {
             steps {
-                checkout scm
+                bat 'python --version'
+                bat 'docker --version'
             }
         }
 
         stage('Install Dependencies') {
             steps {
-                sh '''
-                    python3 -m venv .venv
-                    . .venv/bin/activate
-                    pip install --upgrade pip
-                    pip install -r requirements.txt
-                '''
+                bat 'python -m pip install -r requirements.txt'
+                bat 'python -m pip install pytest'
             }
         }
 
-        stage('Test Application') {
+        stage('Run Automated Tests') {
             steps {
-                sh '''
-                    . .venv/bin/activate
-                    pytest -v
-                '''
+                bat 'python -m pytest -v'
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                sh '''
-                    docker build -t ${IMAGE_NAME} .
-                '''
+                bat 'docker build -t little-bloom-cafe:local .'
             }
         }
 
-        stage('Login to Amazon ECR') {
+        stage('Deploy Container') {
             steps {
-                sh '''
-                    aws ecr get-login-password \
-                      --region ${AWS_REGION} \
-                    | docker login \
-                      --username AWS \
-                      --password-stdin ${ECR_REGISTRY}
-                '''
+                bat 'docker rm -f little-bloom-cafe 2>NUL || exit /b 0'
+                bat 'docker run -d --name little-bloom-cafe -p 5000:5000 little-bloom-cafe:local'
             }
         }
 
-        stage('Push Image to ECR') {
+        stage('Verify Application') {
             steps {
-                sh '''
-                    docker push ${IMAGE_NAME}
-                '''
-            }
-        }
-
-        stage('Deploy to Minikube') {
-            steps {
-                sh '''
-                    kubectl apply -f k8s/deployment.yaml
-                    kubectl apply -f k8s/service.yaml
-                    kubectl rollout status deployment/little-bloom-cafe \
-                      --timeout=180s
-                '''
+                bat 'curl.exe --fail --retry 10 --retry-connrefused --retry-delay 2 http://localhost:5000/'
             }
         }
     }
 
     post {
         success {
-            echo 'SUCCESS: Little Bloom Cafe pipeline completed.'
+            echo 'SUCCESS: Tests passed, image built, and application verified.'
         }
         failure {
-            echo 'FAILED: Check the stage logs for the error.'
-        }
-        always {
-            echo 'Pipeline execution finished.'
+            echo 'FAILED: Check the stage console output to identify the error.'
         }
     }
 }
