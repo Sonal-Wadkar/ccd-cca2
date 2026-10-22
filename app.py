@@ -160,7 +160,7 @@ html = """
     <div class="hero" id="home">
         <h1>A Little Cup of Happiness ☕</h1>
         <p>Fresh coffee, sweet treats, and cozy moments.</p>
-        <p>Now opening at new locations over New York!</p>
+        <p>Now opening at new locations over New York! Come visit us soon!</p>
         <a href="#menu" class="btn">Explore Our Menu</a>
     </div>
 
